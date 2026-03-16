@@ -4,16 +4,16 @@ Uma extensão de Chrome que detecta questionários/provas feitos no Google Forms
 
 ## Recursos
 - Detecta automaticamente perguntas de múltipla escolha em `docs.google.com/forms`.
-- Adiciona um chip discreto, com a mesma paleta do Forms, contendo o botão **“Resolver com IA”**.
-- Ao receber a resposta da OpenAI, marca automaticamente a alternativa correspondente no formulário (sem destacar texto).
-- Mantém um aviso mínimo no chip para informar se a marcação foi feita ou se houve algum erro.
+- Transforma a **primeira palavra da pergunta** em um botão secreto: clicou, ele consulta a IA.
+- Ao receber a resposta da OpenAI, marca automaticamente a alternativa correspondente no formulário (sem mostrar textos extras na tela).
+- Indica sucesso/erro apenas mudando brevemente a cor da palavra-botão (bem discreto).
 - Configuração simples da API key e modelo preferido via página de opções da extensão.
 
 ## Como usar
 1. Acesse `chrome://extensions`, ative o **Modo do desenvolvedor** e clique em **Carregar sem compactação**.
 2. Selecione a pasta `extensions/forms-ai-helper`.
 3. Abra a página de opções da extensão e informe sua **OpenAI API Key** (modelo padrão `gpt-4o-mini`).
-4. Abra qualquer questionário do Google Forms. Use o botão **“Resolver com IA”** para cada pergunta; a alternativa será marcada automaticamente.
+4. Abra qualquer questionário do Google Forms. Clique na **primeira palavra da pergunta** para acionar a IA; a alternativa será marcada automaticamente.
 
 ## Estrutura
 ```

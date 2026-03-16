@@ -1,39 +1,41 @@
 const STYLE_ID = "forms-quiz-companion-style";
 
 const style = `
-.fqc-chip {
-  position: relative;
-  margin-top: 0.65rem;
-  border-radius: 12px;
-  padding: 0.4rem 0.75rem;
-  background: rgba(248, 249, 250, 0.95);
-  border: 1px solid rgba(218, 220, 224, 0.9);
-  color: #1f1f1f;
-  font-size: 0.85rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.fqc-chip button {
-  border: 1px solid rgba(218, 220, 224, 1);
-  background: #ffffff;
-  color: #1f1f1f;
-  border-radius: 999px;
-  padding: 0.3rem 0.8rem;
-  font-size: 0.75rem;
+.fqc-trigger {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  margin: 0;
   cursor: pointer;
+  text-decoration: none;
+  position: relative;
 }
-.fqc-chip button:hover {
-  background: #f1f3f4;
+.fqc-trigger::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.12;
 }
-.fqc-chip .message {
-  flex: 1;
-  color: #5f6368;
+.fqc-trigger:hover::after {
+  opacity: 0.35;
 }
-.fqc-chip .message.success {
+.fqc-trigger:focus-visible {
+  outline: 2px solid rgba(26, 115, 232, 0.35);
+  border-radius: 2px;
+}
+.fqc-trigger--busy {
+  opacity: 0.6;
+}
+.fqc-trigger--ok {
   color: #1a73e8;
 }
-.fqc-chip .message.error {
+.fqc-trigger--error {
   color: #d93025;
 }
 `;
@@ -68,19 +70,26 @@ function enhanceQuestions() {
   const blocks = document.querySelectorAll('div[role="listitem"]');
   blocks.forEach((block) => {
     if (block.dataset.fqcEnhanced) return;
-    const question = extractQuestion(block);
+    const questionInfo = extractQuestion(block);
     const optionData = collectOptionData(block);
-    if (!question || !optionData.length) return;
+    if (!questionInfo?.text || !optionData.length) return;
+    const trigger = toTrigger(questionInfo.node);
+    if (!trigger) return;
     block.dataset.fqcEnhanced = "true";
-    attachChip(block, question, optionData);
+    attachTrigger(trigger, questionInfo.text, optionData);
   });
 }
 
 function extractQuestion(block) {
   const heading = block.querySelector('[role="heading"], .M7eMe');
-  if (heading?.textContent?.trim()) return heading.textContent.trim();
+  if (heading?.textContent?.trim()) {
+    return { text: heading.textContent.trim(), node: heading };
+  }
   const label = block.querySelector('.Qr7Oae');
-  return label?.textContent?.trim() || "";
+  if (label?.textContent?.trim()) {
+    return { text: label.textContent.trim(), node: label };
+  }
+  return null;
 }
 
 function collectOptionData(block) {
@@ -106,59 +115,78 @@ function collectOptionData(block) {
   return options;
 }
 
-function attachChip(block, question, optionData) {
-  const chip = document.createElement("div");
-  chip.className = "fqc-chip";
-  chip.innerHTML = `
-    <button type="button">Resolver com IA</button>
-    <div class="message">Sem sugestões ainda</div>
-  `;
-  const button = chip.querySelector("button");
-  const message = chip.querySelector(".message");
+function toTrigger(container) {
+  if (!(container instanceof HTMLElement)) return null;
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      return node.textContent?.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+    }
+  });
+  const textNode = walker.nextNode();
+  if (!textNode) return null;
 
-  button.addEventListener("click", () => {
-    message.textContent = "Consultando IA...";
-    message.classList.remove("success", "error");
-    button.disabled = true;
+  const match = textNode.textContent.match(/^(\s*)(\S+)([\s\S]*)$/);
+  if (!match) return null;
+  const [, leading, firstWord, rest] = match;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "fqc-trigger";
+  button.textContent = firstWord;
+  button.title = "Resolver esta questão com IA";
+
+  const fragment = document.createDocumentFragment();
+  if (leading) fragment.appendChild(document.createTextNode(leading));
+  fragment.appendChild(button);
+  if (rest) fragment.appendChild(document.createTextNode(rest));
+
+  textNode.parentNode.replaceChild(fragment, textNode);
+  return button;
+}
+
+function attachTrigger(trigger, questionText, optionData) {
+  trigger.addEventListener("click", () => {
+    if (trigger.dataset.fqcBusy === "1") return;
+    trigger.dataset.fqcBusy = "1";
+    trigger.classList.remove("fqc-trigger--ok", "fqc-trigger--error");
+    trigger.classList.add("fqc-trigger--busy");
+
     chrome.runtime.sendMessage(
       {
         type: "ask-ai",
-        payload: { question, options: optionData.map((opt) => opt.label) }
+        payload: { question: questionText, options: optionData.map((opt) => opt.label) }
       },
       (response) => {
-        button.disabled = false;
+        trigger.dataset.fqcBusy = "0";
+        trigger.classList.remove("fqc-trigger--busy");
         if (chrome.runtime.lastError) {
-          showError(message, chrome.runtime.lastError.message);
+          flashState(trigger, "fqc-trigger--error");
+          console.error("Forms Quiz Companion", chrome.runtime.lastError.message);
           return;
         }
         if (response?.error) {
-          showError(message, response.error);
+          flashState(trigger, "fqc-trigger--error");
+          console.error("Forms Quiz Companion", response.error);
           return;
         }
         const { result } = response || {};
         if (!result) {
-          showError(message, "Sem retorno da IA.");
+          flashState(trigger, "fqc-trigger--error");
           return;
         }
         const markResult = markOption(optionData, result);
-        if (markResult.success) {
-          message.textContent = `Alternativa marcada: ${markResult.label}`;
-          message.classList.add("success");
-        } else {
-          message.textContent = markResult.reason || "Não consegui marcar.";
-          message.classList.add("error");
+        flashState(trigger, markResult.success ? "fqc-trigger--ok" : "fqc-trigger--error");
+        if (!markResult.success) {
+          console.warn("Forms Quiz Companion", markResult.reason);
         }
       }
     );
   });
-
-  block.appendChild(chip);
 }
 
-function showError(el, text) {
-  el.textContent = text;
-  el.classList.remove("success");
-  el.classList.add("error");
+function flashState(trigger, className) {
+  trigger.classList.add(className);
+  setTimeout(() => trigger.classList.remove(className), 1800);
 }
 
 function markOption(optionData, result) {
