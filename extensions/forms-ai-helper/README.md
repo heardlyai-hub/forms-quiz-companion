@@ -1,0 +1,25 @@
+# Forms Quiz Companion
+
+Uma extensão de Chrome que detecta questionários/provas feitos no Google Forms e sugere respostas usando a API da OpenAI.
+
+## Recursos
+- Detecta automaticamente perguntas de múltipla escolha em `docs.google.com/forms`.
+- Adiciona um chip discreto abaixo de cada pergunta com o botão **“Sugerir resposta”**.
+- Envia a pergunta e as alternativas para a OpenAI e exibe a sugestão diretamente na página.
+- Configuração simples da API key e modelo preferido via página de opções da extensão.
+
+## Como usar
+1. Acesse `chrome://extensions`, ative o **Modo do desenvolvedor** e clique em **Carregar sem compactação**.
+2. Selecione a pasta `extensions/forms-ai-helper`.
+3. Abra a página de opções da extensão e informe sua **OpenAI API Key** (modelo padrão `gpt-4o-mini`).
+4. Abra qualquer questionário do Google Forms. Um chip aparecerá em cada pergunta com a opção de consultar a IA.
+
+## Estrutura
+```
+manifest.json        Configuração MV3
+background.js        Service worker que consulta a API da OpenAI
+content.js           Injeta botões nas perguntas do Forms
+options.html/js      Página para salvar a API key e modelo
+```
+
+> **Importante:** guarde sua API key com segurança. A extensão usa `chrome.storage.sync`, que é criptografado pela conta Google do usuário.

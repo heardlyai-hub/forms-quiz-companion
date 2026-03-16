@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Configurações - Forms Quiz Companion</title>
+  <style>
+    body {
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 2rem;
+      background: #0f172a;
+      color: #f8fafc;
+    }
+    .card {
+      max-width: 480px;
+      margin: 0 auto;
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 20px 40px rgb(15 23 42 / 0.55);
+    }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+      margin-bottom: 0.4rem;
+    }
+    input, select {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      padding: 0.75rem 1rem;
+      font-size: 1rem;
+      background: #0f172a;
+      color: #f8fafc;
+      margin-bottom: 1rem;
+    }
+    button {
+      width: 100%;
+      border: none;
+      border-radius: 12px;
+      padding: 0.9rem 1rem;
+      font-size: 1rem;
+      font-weight: 600;
+      background: linear-gradient(120deg, #38bdf8, #0ea5e9);
+      color: white;
+      cursor: pointer;
+    }
+    .status {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: #bae6fd;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Forms Quiz Companion</h1>
+    <p>Informe sua chave da OpenAI e, opcionalmente, ajuste o modelo.</p>
+    <label for="apiKey">OpenAI API Key</label>
+    <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off" />
+
+    <label for="model">Modelo</label>
+    <select id="model">
+      <option value="gpt-4o-mini">gpt-4o-mini</option>
+      <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+      <option value="gpt-4o">gpt-4o</option>
+    </select>
+
+    <button id="saveBtn">Salvar configurações</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

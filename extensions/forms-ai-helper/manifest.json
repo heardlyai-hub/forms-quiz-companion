@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Forms Quiz Companion",
+  "description": "Detecta questionários do Google Forms e sugere respostas usando IA.",
+  "version": "0.1.0",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://docs.google.com/forms/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  ],
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://docs.google.com/forms/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
