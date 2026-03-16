@@ -3,33 +3,38 @@ const STYLE_ID = "forms-quiz-companion-style";
 const style = `
 .fqc-chip {
   position: relative;
-  margin-top: 0.75rem;
+  margin-top: 0.65rem;
   border-radius: 12px;
-  padding: 0.65rem 0.9rem;
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  color: #e2e8f0;
-  font-size: 0.9rem;
+  padding: 0.4rem 0.75rem;
+  background: rgba(248, 249, 250, 0.95);
+  border: 1px solid rgba(218, 220, 224, 0.9);
+  color: #1f1f1f;
+  font-size: 0.85rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.4);
 }
 .fqc-chip button {
-  border: none;
-  background: linear-gradient(120deg, #38bdf8, #0ea5e9);
-  color: white;
+  border: 1px solid rgba(218, 220, 224, 1);
+  background: #ffffff;
+  color: #1f1f1f;
   border-radius: 999px;
-  padding: 0.35rem 0.9rem;
-  font-size: 0.8rem;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.75rem;
   cursor: pointer;
 }
-.fqc-chip small {
-  color: #94a3b8;
+.fqc-chip button:hover {
+  background: #f1f3f4;
 }
-.fqc-chip .answer {
-  font-weight: 600;
-  color: #f8fafc;
+.fqc-chip .message {
+  flex: 1;
+  color: #5f6368;
+}
+.fqc-chip .message.success {
+  color: #1a73e8;
+}
+.fqc-chip .message.error {
+  color: #d93025;
 }
 `;
 
@@ -64,10 +69,10 @@ function enhanceQuestions() {
   blocks.forEach((block) => {
     if (block.dataset.fqcEnhanced) return;
     const question = extractQuestion(block);
-    const options = extractOptions(block);
-    if (!question || !options.length) return;
+    const optionData = collectOptionData(block);
+    if (!question || !optionData.length) return;
     block.dataset.fqcEnhanced = "true";
-    attachChip(block, question, options);
+    attachChip(block, question, optionData);
   });
 }
 
@@ -78,66 +83,128 @@ function extractQuestion(block) {
   return label?.textContent?.trim() || "";
 }
 
-function extractOptions(block) {
+function collectOptionData(block) {
   const radios = block.querySelectorAll('[role="radio"], [role="checkbox"]');
-  const options = new Set();
+  const options = [];
+  const seen = new Set();
   radios.forEach((el) => {
-    const text = el.getAttribute("aria-label") || el.textContent;
-    if (text?.trim()) options.add(text.trim());
+    const text = (el.getAttribute("aria-label") || el.textContent || "").trim();
+    if (!text || seen.has(text)) return;
+    seen.add(text);
+    options.push({ label: text, element: el });
   });
-  if (options.size) return Array.from(options);
+  if (options.length) return options;
 
   const paragraphs = block.querySelectorAll('div[dir="auto"]');
   paragraphs.forEach((p) => {
-    if (p.textContent?.trim()) options.add(p.textContent.trim());
+    const text = p.textContent?.trim();
+    if (text && !seen.has(text)) {
+      seen.add(text);
+      options.push({ label: text, element: null });
+    }
   });
-  return Array.from(options);
+  return options;
 }
 
-function attachChip(block, question, options) {
+function attachChip(block, question, optionData) {
   const chip = document.createElement("div");
   chip.className = "fqc-chip";
   chip.innerHTML = `
-    <button type="button">Sugerir resposta</button>
-    <div class="message">Clique para sugerir</div>
+    <button type="button">Resolver com IA</button>
+    <div class="message">Sem sugestões ainda</div>
   `;
   const button = chip.querySelector("button");
   const message = chip.querySelector(".message");
 
   button.addEventListener("click", () => {
     message.textContent = "Consultando IA...";
+    message.classList.remove("success", "error");
     button.disabled = true;
     chrome.runtime.sendMessage(
       {
         type: "ask-ai",
-        payload: { question, options }
+        payload: { question, options: optionData.map((opt) => opt.label) }
       },
       (response) => {
         button.disabled = false;
         if (chrome.runtime.lastError) {
-          message.textContent = chrome.runtime.lastError.message;
+          showError(message, chrome.runtime.lastError.message);
           return;
         }
         if (response?.error) {
-          message.textContent = response.error;
+          showError(message, response.error);
           return;
         }
         const { result } = response || {};
         if (!result) {
-          message.textContent = "Sem retorno da IA.";
+          showError(message, "Sem retorno da IA.");
           return;
         }
-        const answer = result.answer || result.letter || "Resposta sugerida";
-        const confidence = result.confidence ? ` (${result.confidence})` : "";
-        message.innerHTML = `<span class="answer">${answer}</span>${confidence}`;
-        if (result.reason) {
-          const reason = document.createElement("small");
-          reason.textContent = result.reason;
-          chip.appendChild(reason);
+        const markResult = markOption(optionData, result);
+        if (markResult.success) {
+          message.textContent = `Alternativa marcada: ${markResult.label}`;
+          message.classList.add("success");
+        } else {
+          message.textContent = markResult.reason || "Não consegui marcar.";
+          message.classList.add("error");
         }
       }
     );
   });
 
   block.appendChild(chip);
+}
+
+function showError(el, text) {
+  el.textContent = text;
+  el.classList.remove("success");
+  el.classList.add("error");
+}
+
+function markOption(optionData, result) {
+  if (!optionData.length) {
+    return { success: false, reason: "Sem opções interativas." };
+  }
+
+  const normalized = (text) =>
+    text
+      ?.toString()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+
+  let target = null;
+
+  if (result.letter) {
+    const letter = result.letter.trim().charAt(0).toUpperCase();
+    const index = letter.charCodeAt(0) - 65;
+    if (!Number.isNaN(index) && optionData[index]) {
+      target = optionData[index];
+    }
+  }
+
+  if (!target && result.answer) {
+    const answerNorm = normalized(result.answer);
+    target = optionData.find((opt) => {
+      const labelNorm = normalized(opt.label);
+      return labelNorm === answerNorm || labelNorm.includes(answerNorm) || answerNorm.includes(labelNorm);
+    });
+  }
+
+  if (!target) {
+    return { success: false, reason: "Resposta sugerida não encontrada." };
+  }
+
+  const clickable = target.element?.closest('[role="radio"], [role="checkbox"]') || target.element;
+  if (!(clickable instanceof HTMLElement)) {
+    return { success: false, reason: "Opção não clicável." };
+  }
+
+  clickable.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+  clickable.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  clickable.click();
+
+  return { success: true, label: target.label };
 }
